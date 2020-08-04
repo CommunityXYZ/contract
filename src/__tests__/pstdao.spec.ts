@@ -397,19 +397,19 @@ describe('Propose a vote', () => {
     });
   });
 
-  it('should create a set proposal for a custom field', () => {
-    let voteLength = state.votes.length;
+  // it('should create a set proposal for a custom field', () => {
+  //   let voteLength = state.votes.length;
 
-    handler(state, {input: {
-      function: func,
-      type: 'set',
-      key: 'customKey',
-      value: ['custom', 'value'],
-      note: 'This is my custom field note.'
-    }, caller: addresses.admin});
+  //   handler(state, {input: {
+  //     function: func,
+  //     type: 'set',
+  //     key: 'customKey',
+  //     value: ['custom', 'value'],
+  //     note: 'This is my custom field note.'
+  //   }, caller: addresses.admin});
 
-    expect(state.votes.length).toBe(voteLength+1);
-  });
+  //   expect(state.votes.length).toBe(voteLength+1);
+  // });
 });
 
 describe('Votes', () => {

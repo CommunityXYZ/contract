@@ -276,6 +276,12 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
         throw new ContractError('Data type of key not supported.');
       }
 
+      const whitelist_keys = ['quorum', 'support', 'lockMinLength', 'lockMaxLength', 'role'];
+
+      if (!whitelist_keys.includes(input.key)) {
+        throw new ContractError('Data type of key "' + input.key + '" not allowed.')
+      }
+
       // TODO: Add validators
       if(input.key === 'quorum') {
         if(isNaN(input.value) || input.value < 0.01 || input.value > 0.99) {
@@ -293,9 +299,6 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
         if(!(Number.isInteger(input.value)) || input.value <= state.lockMinLength) {
           throw new ContractError('lockMaxLength cannot be less than or equal to lockMinLength.');
         }
-      } else if(input.key === 'ticker' || input.key === 'balances' || input.key === 'vault' || input.key === 'votes' || input.key === 'roles' || input.key === 'voteLength') {
-        // Reject other keys changes
-        throw new ContractError('This DAO option cannot be changed.');
       }
 
       Object.assign(vote, {
