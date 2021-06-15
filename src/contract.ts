@@ -272,6 +272,7 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
     }
 
     let vote: VoteInterface = {
+      transaction: SmartWeave.transaction.id,
       status: 'active',
       type: voteType,
       note,
@@ -387,6 +388,20 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
 
       votes.push(vote);
     } else if (voteType === 'indicative') {
+      votes.push(vote);
+    } else if (voteType === 'invoke') {
+      if (!input.contract) {
+        throw new ContractError('No contract specified');
+      }
+      if (!input.invocation) {
+        throw new ContractError('No invocation specified');
+      }
+
+      Object.assign(vote, {
+        'contract': input.contract,
+        'invocation': input.invocation
+      });
+
       votes.push(vote);
     } else {
       throw new ContractError('Invalid vote type.');
@@ -525,6 +540,12 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
           settings.set(vote.key, vote.value);
           state.settings = Array.from(settings);
         }
+      } else if (vote.type === 'invoke') {
+        state.foreignCalls.push({
+          txID: vote.transaction,
+          contract: vote.contract,
+          input: vote.invocation
+        });
       }
 
     } else {

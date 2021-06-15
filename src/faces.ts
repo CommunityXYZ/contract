@@ -39,6 +39,7 @@ export interface InputInterface extends VoteInterface {
 }
 
 export interface VoteInterface {
+  transaction?: string;
   status?: VoteStatus;
   type?: VoteType;
   id?: number;
@@ -48,6 +49,8 @@ export interface VoteInterface {
   qty?: number;
   key?: string;
   value?: any;
+  contract?: string;
+  invocation?: any;
   note?: string;
   yays?: number;
   nays?: number;
