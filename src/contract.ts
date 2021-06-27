@@ -8,10 +8,11 @@ import {
   VaultParamsInterface
 } from "./faces";
 
+declare const ContractAssert: any;
 declare const ContractError: any;
 declare const SmartWeave: any;
 
-export function handle(state: StateInterface, action: ActionInterface): { state: StateInterface } | { result: any } {
+export async function handle(state: StateInterface, action: ActionInterface): Promise<{ state: StateInterface; } | { result: any; }> {
   const settings: Map<string, any> = new Map(state.settings);
   const balances: BalancesInterface = state.balances;
   const vault: VaultInterface = state.vault;
@@ -587,6 +588,37 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
     }
 
     return { result: { target, role } };
+  }
+
+  /** Read outbox function */
+  if (input.function === 'readOutbox') {
+    let newState = state;
+
+    for (const contract of state.trustedContracts) {
+      const foreignState: StateInterface = await SmartWeave.contracts.readContractState(contract);
+      ContractAssert(
+        foreignState.foreignCalls,
+        'Contract does not support foreign calls.'
+      );
+
+      const unhandledCalls = foreignState.foreignCalls.filter(
+        (entry) =>
+          entry.contract === SmartWeave.contract.id &&
+          !newState.invocations.includes(entry.txID)
+      );
+
+      for (const call of unhandledCalls) {
+        const res = await handle(newState, {
+          caller: contract,
+          input: call.input,
+        });
+
+        if ("state" in res) newState = res.state;
+        newState.invocations.push(call.txID);
+      }
+    }
+
+    return { state: newState };
   }
 
   function isArweaveAddress(addy: string) {
