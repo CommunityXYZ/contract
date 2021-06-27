@@ -403,6 +403,16 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
       });
 
       votes.push(vote);
+    } else if (voteType === 'addContract' || voteType === 'removeContract') {
+      if (!input.contract) {
+        throw new ContractError('No contract specified');
+      }
+
+      Object.assign(vote, {
+        'contract': input.contract
+      });
+
+      votes.push(vote);
     } else {
       throw new ContractError('Invalid vote type.');
     }
@@ -546,6 +556,18 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
           contract: vote.contract,
           input: vote.invocation
         });
+      } else if (vote.type === 'addContract') {
+        const index = state.trustedContracts.indexOf(vote.contract);
+
+        if (index === -1) {
+          state.trustedContracts.push(vote.contract);
+        }
+      } else if (vote.type === 'removeContract') {
+        const index = state.trustedContracts.indexOf(vote.contract);
+
+        if (index > -1) {
+          state.trustedContracts.splice(index, 1);
+        }
       }
 
     } else {
