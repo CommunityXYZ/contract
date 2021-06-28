@@ -404,13 +404,23 @@ export async function handle(state: StateInterface, action: ActionInterface): Pr
       });
 
       votes.push(vote);
-    } else if (voteType === 'addContract' || voteType === 'removeContract') {
+    } else if (voteType === 'addTrustedContract' || voteType === 'removeTrustedContract') {
       if (!input.contract) {
         throw new ContractError('No contract specified');
       }
 
       Object.assign(vote, {
         'contract': input.contract
+      });
+
+      votes.push(vote);
+    } else if (voteType === 'addTrustedSource' || voteType === 'removeTrustedSource') {
+      if (!input.source) {
+        throw new ContractError('No contract source specified');
+      }
+
+      Object.assign(vote, {
+        'source': input.source
       });
 
       votes.push(vote);
@@ -557,17 +567,29 @@ export async function handle(state: StateInterface, action: ActionInterface): Pr
           contract: vote.contract,
           input: vote.invocation
         });
-      } else if (vote.type === 'addContract') {
-        const index = state.trustedContracts.indexOf(vote.contract);
+      } else if (vote.type === 'addTrustedContract') {
+        const index = state.trusted.contracts.indexOf(vote.contract);
 
         if (index === -1) {
-          state.trustedContracts.push(vote.contract);
+          state.trusted.contracts.push(vote.contract);
         }
-      } else if (vote.type === 'removeContract') {
-        const index = state.trustedContracts.indexOf(vote.contract);
+      } else if (vote.type === 'removeTrustedContract') {
+        const index = state.trusted.contracts.indexOf(vote.contract);
 
         if (index > -1) {
-          state.trustedContracts.splice(index, 1);
+          state.trusted.contracts.splice(index, 1);
+        }
+      } else if (vote.type === 'addTrustedSource') {
+        const index = state.trusted.sources.indexOf(vote.source);
+
+        if (index === -1) {
+          state.trusted.sources.push(vote.source);
+        }
+      } else if (vote.type === 'removeTrustedSource') {
+        const index = state.trusted.sources.indexOf(vote.source);
+
+        if (index > -1) {
+          state.trusted.sources.splice(index, 1);
         }
       }
 
@@ -592,9 +614,44 @@ export async function handle(state: StateInterface, action: ActionInterface): Pr
 
   /** Read outbox function */
   if (input.function === 'readOutbox') {
-    let newState = state;
+    const contracts = state.trusted.contracts;
+    if (input.contract) {
+      const res = await SmartWeave.unsafeClient.api.post(
+        "graphql",
+        {
+          query: `
+          query($contract: ID!) {
+            transactions(ids: [$contract]) {
+              edges {
+                node {
+                  tags {
+                    name
+                    value
+                  }
+                }
+              }
+            }
+          }
+      `,
+          variables: { contract: input.contract },
+        },
+        { headers: { "content-type": "application/json" } }
+      );
 
-    for (const contract of state.trustedContracts) {
+      if (res.data.data.transactions.edges.length) {
+        const tags: { name: string; value: string; }[] = res.data.data.transactions.edges[0].node.tags;
+        const sourceTag = tags.find((tag) => tag.name === "Contract-Src");
+
+        if (sourceTag) {
+          const index = state.trusted.sources.indexOf(sourceTag.value);
+
+          if (index > -1) contracts.push(input.contract);
+        }
+      }
+    }
+    
+    let newState = state;
+    for (const contract of contracts) {
       const foreignState: StateInterface = await SmartWeave.contracts.readContractState(contract);
       ContractAssert(
         foreignState.foreignCalls,

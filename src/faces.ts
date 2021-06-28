@@ -8,7 +8,10 @@ export interface StateInterface {
   settings: [string, any][];
   invocations: string[];
   foreignCalls: { txID: string; contract: string; input: any }[];
-  trustedContracts: string[];
+  trusted: {
+    contracts: string[];
+    sources: string[];
+  }
 }
 
 export interface RoleInterface {
@@ -52,6 +55,7 @@ export interface VoteInterface {
   value?: any;
   contract?: string;
   invocation?: any;
+  source?: string;
   note?: string;
   yays?: number;
   nays?: number;
@@ -67,6 +71,6 @@ export interface ResultInterface {
 }
 
 export type VoteStatus = 'active' | 'quorumFailed' | 'passed' | 'failed';
-export type VoteType = 'mint' | 'mintLocked' | 'burnVault' | 'indicative' | 'set' | 'invoke' | 'addContract' | 'removeContract';
+export type VoteType = 'mint' | 'mintLocked' | 'burnVault' | 'indicative' | 'set' | 'invoke' | 'addTrustedContract' | 'removeTrustedContract' | 'addTrustedSource' | 'removeTrustedSource';
 export type GetFunctionType = 'balance' | 'unlockedBalance' | 'vaultBalance' | 'role';
 export type SetFunctionType = 'transfer' | 'transferLocked' | 'vote' | 'propose' | 'finalize' | 'lock' | 'increaseVault' | 'unlock' | 'readOutbox';
