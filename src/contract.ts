@@ -8,10 +8,11 @@ import {
   VaultParamsInterface
 } from "./faces";
 
+declare const ContractAssert: any;
 declare const ContractError: any;
 declare const SmartWeave: any;
 
-export function handle(state: StateInterface, action: ActionInterface): { state: StateInterface } | { result: any } {
+export async function handle(state: StateInterface, action: ActionInterface): Promise<{ state: StateInterface; } | { result: any; }> {
   const settings: Map<string, any> = new Map(state.settings);
   const balances: BalancesInterface = state.balances;
   const vault: VaultInterface = state.vault;
@@ -272,6 +273,7 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
     }
 
     let vote: VoteInterface = {
+      transaction: SmartWeave.transaction.id,
       status: 'active',
       type: voteType,
       note,
@@ -387,6 +389,40 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
 
       votes.push(vote);
     } else if (voteType === 'indicative') {
+      votes.push(vote);
+    } else if (voteType === 'invoke') {
+      if (!input.contract) {
+        throw new ContractError('No contract specified');
+      }
+      if (!input.invocation) {
+        throw new ContractError('No invocation specified');
+      }
+
+      Object.assign(vote, {
+        'contract': input.contract,
+        'invocation': input.invocation
+      });
+
+      votes.push(vote);
+    } else if (voteType === 'addTrustedContract' || voteType === 'removeTrustedContract') {
+      if (!input.contract) {
+        throw new ContractError('No contract specified');
+      }
+
+      Object.assign(vote, {
+        'contract': input.contract
+      });
+
+      votes.push(vote);
+    } else if (voteType === 'addTrustedSource' || voteType === 'removeTrustedSource') {
+      if (!input.source) {
+        throw new ContractError('No contract source specified');
+      }
+
+      Object.assign(vote, {
+        'source': input.source
+      });
+
       votes.push(vote);
     } else {
       throw new ContractError('Invalid vote type.');
@@ -525,6 +561,36 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
           settings.set(vote.key, vote.value);
           state.settings = Array.from(settings);
         }
+      } else if (vote.type === 'invoke') {
+        state.foreignCalls.push({
+          txID: vote.transaction,
+          contract: vote.contract,
+          input: vote.invocation
+        });
+      } else if (vote.type === 'addTrustedContract') {
+        const index = state.trusted.contracts.indexOf(vote.contract);
+
+        if (index === -1) {
+          state.trusted.contracts.push(vote.contract);
+        }
+      } else if (vote.type === 'removeTrustedContract') {
+        const index = state.trusted.contracts.indexOf(vote.contract);
+
+        if (index > -1) {
+          state.trusted.contracts.splice(index, 1);
+        }
+      } else if (vote.type === 'addTrustedSource') {
+        const index = state.trusted.sources.indexOf(vote.source);
+
+        if (index === -1) {
+          state.trusted.sources.push(vote.source);
+        }
+      } else if (vote.type === 'removeTrustedSource') {
+        const index = state.trusted.sources.indexOf(vote.source);
+
+        if (index > -1) {
+          state.trusted.sources.splice(index, 1);
+        }
       }
 
     } else {
@@ -544,6 +610,75 @@ export function handle(state: StateInterface, action: ActionInterface): { state:
     }
 
     return { result: { target, role } };
+  }
+
+  /** Read outbox function */
+  if (input.function === 'readOutbox') {
+    const contracts = [...state.trusted.contracts];
+    if (input.contract) {
+      const res = await SmartWeave.unsafeClient.api.post(
+        "graphql",
+        {
+          query: `
+          query($contract: ID!) {
+            transactions(ids: [$contract]) {
+              edges {
+                node {
+                  tags {
+                    name
+                    value
+                  }
+                }
+              }
+            }
+          }
+      `,
+          variables: { contract: input.contract },
+        },
+        { headers: { "content-type": "application/json" } }
+      );
+
+      if (res.data.data.transactions.edges.length) {
+        const tags: { name: string; value: string; }[] = res.data.data.transactions.edges[0].node.tags;
+        const sourceTag = tags.find((tag) => tag.name === "Contract-Src");
+
+        if (sourceTag) {
+          const index = state.trusted.sources.indexOf(sourceTag.value);
+
+          if (index > -1) contracts.push(input.contract);
+        }
+      }
+    }
+    
+    let newState = state;
+    for (const contract of contracts) {
+      const foreignState: StateInterface = await SmartWeave.contracts.readContractState(contract);
+      ContractAssert(
+        foreignState.foreignCalls,
+        'Contract does not support foreign calls.'
+      );
+
+      const unhandledCalls = foreignState.foreignCalls.filter(
+        (entry) =>
+          entry.contract === SmartWeave.contract.id &&
+          !newState.invocations.includes(entry.txID)
+      );
+
+      for (const call of unhandledCalls) {
+        let res: any;
+        try {
+          res = await handle(newState, {
+            caller: contract,
+            input: call.input,
+          });
+        } catch {}
+
+        if (res) newState = res.state;
+        newState.invocations.push(call.txID);
+      }
+    }
+
+    return { state: newState };
   }
 
   function isArweaveAddress(addy: string) {

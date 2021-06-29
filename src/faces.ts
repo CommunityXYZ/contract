@@ -6,6 +6,12 @@ export interface StateInterface {
   votes: VoteInterface[];
   roles: RoleInterface;
   settings: [string, any][];
+  invocations: string[];
+  foreignCalls: { txID: string; contract: string; input: any }[];
+  trusted: {
+    contracts: string[];
+    sources: string[];
+  }
 }
 
 export interface RoleInterface {
@@ -37,6 +43,7 @@ export interface InputInterface extends VoteInterface {
 }
 
 export interface VoteInterface {
+  transaction?: string;
   status?: VoteStatus;
   type?: VoteType;
   id?: number;
@@ -46,6 +53,9 @@ export interface VoteInterface {
   qty?: number;
   key?: string;
   value?: any;
+  contract?: string;
+  invocation?: any;
+  source?: string;
   note?: string;
   yays?: number;
   nays?: number;
@@ -61,6 +71,6 @@ export interface ResultInterface {
 }
 
 export type VoteStatus = 'active' | 'quorumFailed' | 'passed' | 'failed';
-export type VoteType = 'mint' | 'mintLocked' | 'burnVault' | 'indicative' | 'set';
+export type VoteType = 'mint' | 'mintLocked' | 'burnVault' | 'indicative' | 'set' | 'invoke' | 'addTrustedContract' | 'removeTrustedContract' | 'addTrustedSource' | 'removeTrustedSource';
 export type GetFunctionType = 'balance' | 'unlockedBalance' | 'vaultBalance' | 'role';
-export type SetFunctionType = 'transfer' | 'transferLocked' | 'vote' | 'propose' | 'finalize' | 'lock' | 'increaseVault' | 'unlock' | 'extend';
+export type SetFunctionType = 'transfer' | 'transferLocked' | 'vote' | 'propose' | 'finalize' | 'lock' | 'increaseVault' | 'unlock' | 'readOutbox';
