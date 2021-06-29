@@ -614,7 +614,7 @@ export async function handle(state: StateInterface, action: ActionInterface): Pr
 
   /** Read outbox function */
   if (input.function === 'readOutbox') {
-    const contracts = state.trusted.contracts;
+    const contracts = [...state.trusted.contracts];
     if (input.contract) {
       const res = await SmartWeave.unsafeClient.api.post(
         "graphql",
@@ -665,12 +665,15 @@ export async function handle(state: StateInterface, action: ActionInterface): Pr
       );
 
       for (const call of unhandledCalls) {
-        const res = await handle(newState, {
-          caller: contract,
-          input: call.input,
-        });
+        let res: any;
+        try {
+          res = await handle(newState, {
+            caller: contract,
+            input: call.input,
+          });
+        } catch {}
 
-        if ("state" in res) newState = res.state;
+        if (res) newState = res.state;
         newState.invocations.push(call.txID);
       }
     }
